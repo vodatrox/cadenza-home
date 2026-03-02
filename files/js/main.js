@@ -7,7 +7,7 @@
   'use strict';
 
   // --- Sticky Header ---
-  const header = document.getElementById('header');
+  var header = document.getElementById('header');
   function handleScroll() {
     if (window.scrollY > 60) {
       header.classList.add('scrolled');
@@ -18,26 +18,54 @@
   window.addEventListener('scroll', handleScroll, { passive: true });
   handleScroll();
 
-  // --- Mobile Menu Toggle ---
-  const navToggle = document.getElementById('navToggle');
-  const navMenu = document.getElementById('navMenu');
+  // --- Mobile Menu ---
+  var navToggle = document.getElementById('navToggle');
+  var navMenu = document.getElementById('navMenu');
+  var overlay = document.createElement('div');
+  overlay.className = 'nav-overlay';
+  document.body.appendChild(overlay);
+
+  function openMenu() {
+    navToggle.classList.add('active');
+    navMenu.classList.add('open');
+    overlay.classList.add('visible');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeMenu() {
+    navToggle.classList.remove('active');
+    navMenu.classList.remove('open');
+    overlay.classList.remove('visible');
+    document.body.style.overflow = '';
+  }
 
   navToggle.addEventListener('click', function () {
-    navToggle.classList.toggle('active');
-    navMenu.classList.toggle('open');
-    document.body.style.overflow = navMenu.classList.contains('open') ? 'hidden' : '';
+    navMenu.classList.contains('open') ? closeMenu() : openMenu();
   });
 
-  // Close menu when a link is clicked
+  // Close on overlay tap
+  overlay.addEventListener('click', closeMenu);
+
+  // Close on link tap
   navMenu.querySelectorAll('.nav-link').forEach(function (link) {
-    link.addEventListener('click', function () {
-      navToggle.classList.remove('active');
-      navMenu.classList.remove('open');
-      document.body.style.overflow = '';
-    });
+    link.addEventListener('click', closeMenu);
   });
 
-  // --- Smooth Scroll for anchor links ---
+  // Close on Escape key
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && navMenu.classList.contains('open')) {
+      closeMenu();
+    }
+  });
+
+  // Close menu on resize to desktop
+  window.addEventListener('resize', function () {
+    if (window.innerWidth > 768 && navMenu.classList.contains('open')) {
+      closeMenu();
+    }
+  });
+
+  // --- Smooth Scroll ---
   document.querySelectorAll('a[href^="#"]').forEach(function (anchor) {
     anchor.addEventListener('click', function (e) {
       var target = document.querySelector(this.getAttribute('href'));
@@ -50,24 +78,30 @@
     });
   });
 
-  // --- Scroll Reveal ---
+  // --- Scroll Reveal (with IntersectionObserver for performance) ---
   var reveals = document.querySelectorAll('.reveal');
 
-  function checkReveal() {
-    var windowHeight = window.innerHeight;
+  if ('IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+
     reveals.forEach(function (el) {
-      var top = el.getBoundingClientRect().top;
-      if (top < windowHeight - 80) {
-        el.classList.add('visible');
-      }
+      observer.observe(el);
+    });
+  } else {
+    // Fallback for older browsers: show everything
+    reveals.forEach(function (el) {
+      el.classList.add('visible');
     });
   }
 
-  window.addEventListener('scroll', checkReveal, { passive: true });
-  window.addEventListener('load', checkReveal);
-  checkReveal();
-
-  // --- Contact Form Handler ---
+  // --- Contact Form Handler (Formspree) ---
   var form = document.getElementById('contactForm');
   if (form) {
     form.addEventListener('submit', function (e) {
@@ -77,18 +111,33 @@
       btn.textContent = 'Sending...';
       btn.disabled = true;
 
-      // Simulate form submission (replace with actual endpoint)
-      setTimeout(function () {
-        btn.textContent = 'Message Sent!';
-        btn.style.background = '#16a34a';
-        form.reset();
-
+      fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'Accept': 'application/json' }
+      }).then(function (response) {
+        if (response.ok) {
+          btn.textContent = 'Message Sent!';
+          btn.style.background = '#16a34a';
+          form.reset();
+        } else {
+          btn.textContent = 'Failed — Try Again';
+          btn.style.background = '#dc2626';
+        }
         setTimeout(function () {
           btn.textContent = originalText;
           btn.style.background = '';
           btn.disabled = false;
         }, 3000);
-      }, 1000);
+      }).catch(function () {
+        btn.textContent = 'Network Error';
+        btn.style.background = '#dc2626';
+        setTimeout(function () {
+          btn.textContent = originalText;
+          btn.style.background = '';
+          btn.disabled = false;
+        }, 3000);
+      });
     });
   }
 })();
